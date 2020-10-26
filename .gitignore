@@ -4,3 +4,4 @@
 .vagrant/
 .serverless/
 services/image-upload/bin/*
+.env*

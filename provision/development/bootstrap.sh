@@ -69,6 +69,7 @@ su - vagrant -c "source ~/.nvm/nvm.sh; nvm install 12.19.0"
 #####################
 
 su - vagrant -c "source ~/.nvm/nvm.sh; npm install -g serverless"
+su - vagrant -c "source ~/.nvm/nvm.sh; npm install -g serverless-dotenv-plugin"
 
 
 #################

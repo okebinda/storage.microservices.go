@@ -8,16 +8,19 @@ service: image-upload
 
 frameworkVersion: '>=2.0.0 <3.0.0'
 
+plugins:
+  - serverless-dotenv-plugin
+
 # custom variables - you should change these to your own values
 custom:
-  domain: "domain.com"
-  prefix: "aws-com-domain"
+  domain: ${env:DOMAIN, "domain.com"}
+  prefix: ${env:PREFIX, "aws-com-domain"}
+  apiSecretKey: ${env:API_SECRET_KEY, "-"}
+  apiUsername: ${env:API_USERNAME, "-"}
+  apiPassword: ${env:API_PASSWORD, "-"}
   maxUploadBytes: "6291456"
   maxUploadWidth: "1500"
   maxUploadHeight: "1500"
-  apiSecretKey: "-"
-  apiUsername: "-"
-  apiPassword: "-"
 
 provider:
   name: aws
@@ -69,10 +72,7 @@ functions:
       MAX_BYTES: ${self:custom.maxUploadBytes}
       MAX_WIDTH: ${self:custom.maxUploadWidth}
       MAX_HEIGHT: ${self:custom.maxUploadHeight}
-      CALLBACK_QUEUE:
-        Fn::GetAtt:
-          - ImageUploadCallbackQueue
-          - QueueName
+      CALLBACK_QUEUE: ${self:resources.Resources.ImageUploadCallbackQueue.Properties.QueueName}
 
   # upload-image-callback function
   upload-image-callback:
