@@ -111,7 +111,7 @@ $ ./scripts/lint.sh
 | Directory/File                | Purpose                                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------- |
 | `services/`                   | Contains all source code files required for the services                           |
-| `└─image-upload/`             | Contains the source code for the Image Upload microservice                         |
+| `└─image-upload/`             | Contains the source code for the Image Upload service                              |
 | ` · ├─bin/`                   | Contains compiled service binaries                                                 |
 | ` · ├─upload-image/`          | Contains source code for the Upload Image microservice                             |
 | ` · ├─upload-image-callback/` | Contains source code for the Upload Image Callback microservice                    |
