@@ -3,4 +3,4 @@
 .vscode/
 .vagrant/
 .serverless/
-bin/*
+services/image-upload/bin/*
