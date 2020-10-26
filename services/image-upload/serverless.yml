@@ -8,9 +8,16 @@ service: image-upload
 
 frameworkVersion: '>=2.0.0 <3.0.0'
 
+# custom variables - you should change these to your own values
 custom:
   domain: "domain.com"
   prefix: "aws-com-domain"
+  maxUploadBytes: "6291456"
+  maxUploadWidth: "1500"
+  maxUploadHeight: "1500"
+  apiSecretKey: "-"
+  apiUsername: "-"
+  apiPassword: "-"
 
 provider:
   name: aws
@@ -59,9 +66,9 @@ functions:
     environment:
       AWS_S3_BUCKET_UPLOAD: !Ref ImageUploadBucket
       AWS_S3_BUCKET_PUBLIC: !Ref ImageStaticBucket
-      MAX_BYTES: "6291456"
-      MAX_WIDTH: "1200"
-      MAX_HEIGHT: "1200"
+      MAX_BYTES: ${self:custom.maxUploadBytes}
+      MAX_WIDTH: ${self:custom.maxUploadWidth}
+      MAX_HEIGHT: ${self:custom.maxUploadHeight}
       CALLBACK_QUEUE:
         Fn::GetAtt:
           - ImageUploadCallbackQueue
@@ -78,10 +85,9 @@ functions:
               - ImageUploadCallbackQueue
               - Arn
     environment:
-      ENVIRONMENT: "TEST"
-      # API_SECRET_KEY: "no"
-      API_USERNAME: "no"
-      API_PASSWORD: "no"
+      API_SECRET_KEY: ${self:custom.apiSecretKey}
+      API_USERNAME: ${self:custom.apiUsername}
+      API_PASSWORD: ${self:custom.apiPassword}
 
 # CloudFormation resource templates
 resources:

@@ -82,13 +82,20 @@ $ cd /vagrant/service/image-upload
 $ sls invoke local --function upload-image --data '{"queryStringParameters": {}}'
 ```
 
-URL: https://h5xksuk60c.execute-api.us-east-1.amazonaws.com/dev/upload-url?extension=png&directory=test
-
 ### Deployment
+
+Deploy to the development environment:
 
 ```ssh
 $ cd /vagrant/services/image-upload
-$ sls deploy
+$ sls deploy --stage dev
+```
+
+Deploy to the production environment:
+
+```ssh
+$ cd /vagrant/services/image-upload
+$ sls deploy --stage prod
 ```
 
 ### Linters

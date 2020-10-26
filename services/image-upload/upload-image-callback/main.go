@@ -45,7 +45,6 @@ func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 	defer logger.Sync()
 
 	// get environment parameters
-	environment := os.Getenv("ENVIRONMENT")
 	apiSecretKey := os.Getenv("API_SECRET_KEY")
 	apiUsername := os.Getenv("API_USERNAME")
 	apiPassword := os.Getenv("API_PASSWORD")
@@ -94,17 +93,12 @@ func Handler(ctx context.Context, sqsEvent events.SQSEvent) error {
 			continue
 		}
 
-		// skip actual callback if testing
-		if environment == "TEST" {
-			continue
-		}
-
 		// perform callback
 		req, err := http.NewRequest(http.MethodPost, msg.CallbackURL, bytes.NewBuffer(payload))
-		if apiSecretKey != "" {
+		if apiSecretKey != "" && apiSecretKey != "-" {
 			req.Header.Add("Authorization", fmt.Sprintf("Apikey %s", apiSecretKey))
 		}
-		if apiUsername != "" && apiPassword != "" {
+		if (apiUsername != "" && apiUsername != "-") && (apiPassword != "" && apiPassword != "-") {
 			req.SetBasicAuth(apiUsername, apiPassword)
 		}
 		req.Header.Set("Content-Type", "application/json; charset=utf-8")
