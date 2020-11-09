@@ -19,6 +19,7 @@ custom:
   domain: ${env:DOMAIN, "domain.com"}
   prefix: ${env:PREFIX, "aws-com-domain"}
   imageResizeRatioHostname: ${env:IMAGE_RESIZE_RATIO_HOSTNAME, "XXXXXXXX.execute-api.us-east-1.amazonaws.com"}
+  imageResizeCropHostname: ${env:IMAGE_RESIZE_CROP_HOSTNAME, "XXXXXXXX.execute-api.us-east-1.amazonaws.com"}
   maxWidth: "2000"
   maxHeight: "2000"
   s3Sync:
@@ -58,7 +59,27 @@ functions:
     name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-image-resize-ratio
     events:
       - http:
-          path: /{size}/{image_key+}
+          path: /ratio/{size}/{image_key+}
+          method: get
+          request:
+            parameters:
+              paths:
+                size: true
+                image_key: true
+    environment:
+      AWS_S3_BUCKET_SOURCE: "images.static.${opt:stage,'dev'}.${self:custom.domain}"
+      AWS_S3_BUCKET_DESTINATION: "images.cache.${opt:stage,'dev'}.${self:custom.domain}"
+      REGION: ${self:custom.region}
+      MAX_WIDTH: ${self:custom.maxWidth}
+      MAX_HEIGHT: ${self:custom.maxHeight}
+
+  # image-resize-crop function
+  image-resize-crop:
+    handler: bin/image-resize-crop
+    name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-image-resize-crop
+    events:
+      - http:
+          path: /crop/{size}/{image_key+}
           method: get
           request:
             parameters:
@@ -92,12 +113,24 @@ resources:
             RedirectRule:
               Protocol: https
               HostName: ${self:custom.imageResizeRatioHostname}
-              ReplaceKeyPrefixWith: dev/
+              ReplaceKeyPrefixWith: "${opt:stage,'dev'}/ratio/"
+              HttpRedirectCode: 307
+          - RoutingRuleCondition:
+              HttpErrorCodeReturnedEquals: 404
+              KeyPrefixEquals: crop/
+            RedirectRule:
+              Protocol: https
+              HostName: ${self:custom.imageResizeCropHostname}
+              ReplaceKeyPrefixWith: "${opt:stage,'dev'}/crop/"
               HttpRedirectCode: 307
         LifecycleConfiguration:
           Rules:
             - Id: "Image Cache Expiration Policy: /ratio"
               Prefix: "ratio/"
+              ExpirationInDays: 90
+              Status: Enabled
+            - Id: "Image Cache Expiration Policy: /crop"
+              Prefix: "crop/"
               ExpirationInDays: 90
               Status: Enabled
 
