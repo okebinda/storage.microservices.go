@@ -19,8 +19,8 @@ custom:
   apiUsername: ${env:API_USERNAME, "-"}
   apiPassword: ${env:API_PASSWORD, "-"}
   maxUploadBytes: "6291456"
-  maxUploadWidth: "1500"
-  maxUploadHeight: "1500"
+  maxUploadWidth: "2000"
+  maxUploadHeight: "2000"
 
 provider:
   name: aws
@@ -117,7 +117,7 @@ resources:
               Version: '2012-10-17'
               Statement:
                 - Effect: Allow
-                  Action: s3:*
+                  Action: s3:PutObject
                   Resource:
                     - !Join 
                       - ''
@@ -220,6 +220,7 @@ resources:
           BlockPublicPolicy: false
           IgnorePublicAcls: false
           RestrictPublicBuckets: false
+        DeletionPolicy: Retain
 
     # define a dead letter queue
     DeadLetterQueue:

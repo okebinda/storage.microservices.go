@@ -1,0 +1,121 @@
+# Image Serve Microservice
+#  using Serverless framework
+#  @ref: https://www.serverless.com/blog/dynamic-image-resizing-nodejs
+
+service: image-serve
+# app and org for use with dashboard.serverless.com
+#app: your-app-name
+#org: your-org-name
+
+frameworkVersion: '>=2.0.0 <3.0.0'
+
+plugins:
+  - serverless-dotenv-plugin
+  - serverless-s3-sync
+
+# custom variables - you should change these to your own values
+custom:
+  region: ${env:REGION, "us-east-1"}
+  domain: ${env:DOMAIN, "domain.com"}
+  prefix: ${env:PREFIX, "aws-com-domain"}
+  imageResizeRatioHostname: ${env:IMAGE_RESIZE_RATIO_HOSTNAME, "XXXXXXXX.execute-api.us-east-1.amazonaws.com"}
+  maxWidth: "2000"
+  maxHeight: "2000"
+  s3Sync:
+    - bucketName: images.cache.${opt:stage,'dev'}.${self:custom.domain}
+      localDir: static
+
+provider:
+  name: aws
+  runtime: go1.x
+  deploymentBucket:
+    name: code.${self:custom.domain}
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource: "arn:aws:s3:::images.static.${opt:stage,'dev'}.${self:custom.domain}/*"
+    - Effect: "Allow"
+      Action:
+        - "s3:*"
+      Resource: "arn:aws:s3:::images.cache.${opt:stage,'dev'}.${self:custom.domain}"
+    - Effect: "Allow"
+      Action:
+        - "s3:*"
+      Resource: "arn:aws:s3:::images.cache.${opt:stage,'dev'}.${self:custom.domain}/*"
+
+package:
+  exclude:
+    - ./**
+  include:
+    - ./bin/**
+
+functions:
+
+  # image-resize-ratio function
+  image-resize-ratio:
+    handler: bin/image-resize-ratio
+    name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-image-resize-ratio
+    events:
+      - http:
+          path: /{size}/{image_key+}
+          method: get
+          request:
+            parameters:
+              paths:
+                size: true
+                image_key: true
+    environment:
+      AWS_S3_BUCKET_SOURCE: "images.static.${opt:stage,'dev'}.${self:custom.domain}"
+      AWS_S3_BUCKET_DESTINATION: "images.cache.${opt:stage,'dev'}.${self:custom.domain}"
+      REGION: ${self:custom.region}
+      MAX_WIDTH: ${self:custom.maxWidth}
+      MAX_HEIGHT: ${self:custom.maxHeight}
+
+# CloudFormation resource templates
+resources:
+  Resources:
+
+    # define image cache bucket (public hosting, cache expiration)
+    ImageCacheBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: images.cache.${opt:stage,'dev'}.${self:custom.domain}
+        AccessControl: PublicRead
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+          RoutingRules:
+          - RoutingRuleCondition:
+              HttpErrorCodeReturnedEquals: 404
+              KeyPrefixEquals: ratio/
+            RedirectRule:
+              Protocol: https
+              HostName: ${self:custom.imageResizeRatioHostname}
+              ReplaceKeyPrefixWith: dev/
+              HttpRedirectCode: 307
+        LifecycleConfiguration:
+          Rules:
+            - Id: "Image Cache Expiration Policy: /ratio"
+              Prefix: "ratio/"
+              ExpirationInDays: 90
+              Status: Enabled
+
+    # define policy for image cache bucket
+    ImageCacheBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        PolicyDocument:
+          Id: ${self:custom.prefix}-${opt:stage,'dev'}-image-cache-bucket-policy
+          Version: '2012-10-17'
+          Statement:
+            - Sid: PublicReadForGetBucketObjects
+              Effect: Allow
+              Principal: '*'
+              Action: 's3:GetObject'
+              Resource: !Join 
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref ImageCacheBucket
+                  - /*
+        Bucket: !Ref ImageCacheBucket

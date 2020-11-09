@@ -112,14 +112,83 @@ $ cd /vagrant/service/image-upload
 $ ./scripts/lint.sh
 ```
 
+## Service: Image Serve
+
+### Install Dependencies
+
+```ssh
+$ cd /vagrant/services/image-serve
+$ ./scripts/build.sh
+```
+
+### Compile
+
+```ssh
+$ cd /vagrant/services/image-serve
+$ make
+```
+
+### Local Invocation
+
+```ssh
+$ cd /vagrant/services/image-serve
+$ sls invoke local --function image-resize-ratio --data '{"pathParameters": {"size":"400x300", "image_key":"test/image.jpg"}}'
+```
+
+### Use
+
+In a web browser, go to the public/website URL for the S3 image cache bucket's object, for example:
+
+URL: http://images.cache.dev.domain.com.s3-website-us-east-1.amazonaws.com/ratio/400x300/test/7697338a-343c-4cb3-a45d-73790ce8ca6f.png
+
+For custom domains and SSL certs you may want to use CloudFront to serve the S3 content.
+
+### Deployment
+
+Deploy to the development environment:
+
+```ssh
+$ cd /vagrant/services/image-serve
+$ sls deploy --stage dev
+```
+
+Deploy to the production environment:
+
+```ssh
+$ cd /vagrant/services/image-serve
+$ sls deploy --stage prod
+```
+
+### Linters
+
+List of linters supplied with project:
+
+* gofmt (https://golang.org/cmd/gofmt/)
+* go vet (https://golang.org/cmd/vet/)
+* golint (https://github.com/golang/lint)
+* gosec (https://github.com/securego/gosec)
+
+```ssh
+$ cd /vagrant/service/image-serve
+$ ./scripts/lint.sh
+```
 
 ## Repository Directory Structure
 
 | Directory/File                | Purpose                                                                            |
 | ----------------------------- | ---------------------------------------------------------------------------------- |
 | `services/`                   | Contains all source code files required for the services                           |
+| `├─image-serve/`              | Contains the source code for the Image Serve service                               |
+| `|· ├─bin/`                   | Contains compiled service binaries                                                 |
+| `|· ├─image-resize-ratio/`    | Contains source code for the Image Resize Ratio microservice                       |
+| `|· ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
+| `|· ├─static/`                | Contains HTML files for the index and error pages used for S3 website hosting      |
+| `|· ├─go.mod`                 | Dependency requirements                                                            |
+| `|· ├─Makefile`               | Instructions for `make` to build service binaries                                  |
+| `|· └─serverless.yml`         | Serverless framework configuration file                                            |
 | `└─image-upload/`             | Contains the source code for the Image Upload service                              |
 | ` · ├─bin/`                   | Contains compiled service binaries                                                 |
+| ` · ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
 | ` · ├─upload-image/`          | Contains source code for the Upload Image microservice                             |
 | ` · ├─upload-image-callback/` | Contains source code for the Upload Image Callback microservice                    |
 | ` · ├─upload-url/`            | Contains source code for the Upload URL microservice                               |
