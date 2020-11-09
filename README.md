@@ -179,13 +179,13 @@ $ ./scripts/lint.sh
 | ----------------------------- | ---------------------------------------------------------------------------------- |
 | `services/`                   | Contains all source code files required for the services                           |
 | `├─image-serve/`              | Contains the source code for the Image Serve service                               |
-| `|· ├─bin/`                   | Contains compiled service binaries                                                 |
-| `|· ├─image-resize-ratio/`    | Contains source code for the Image Resize Ratio microservice                       |
-| `|· ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
-| `|· ├─static/`                | Contains HTML files for the index and error pages used for S3 website hosting      |
-| `|· ├─go.mod`                 | Dependency requirements                                                            |
-| `|· ├─Makefile`               | Instructions for `make` to build service binaries                                  |
-| `|· └─serverless.yml`         | Serverless framework configuration file                                            |
+| `│· ├─bin/`                   | Contains compiled service binaries                                                 |
+| `│· ├─image-resize-ratio/`    | Contains source code for the Image Resize Ratio microservice                       |
+| `│· ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
+| `│· ├─static/`                | Contains HTML files for the index and error pages used for S3 website hosting      |
+| `│· ├─go.mod`                 | Dependency requirements                                                            |
+| `│· ├─Makefile`               | Instructions for `make` to build service binaries                                  |
+| `│· └─serverless.yml`         | Serverless framework configuration file                                            |
 | `└─image-upload/`             | Contains the source code for the Image Upload service                              |
 | ` · ├─bin/`                   | Contains compiled service binaries                                                 |
 | ` · ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
