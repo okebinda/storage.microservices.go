@@ -13,6 +13,7 @@ plugins:
 
 # custom variables - you should change these to your own values
 custom:
+  region: ${env:REGION, "us-east-1"}
   domain: ${env:DOMAIN, "domain.com"}
   prefix: ${env:PREFIX, "aws-com-domain"}
   apiSecretKey: ${env:API_SECRET_KEY, "-"}
@@ -24,6 +25,7 @@ custom:
 
 provider:
   name: aws
+  region: ${self:custom.region}
   runtime: go1.x
   deploymentBucket:
     name: code.${self:custom.domain}
@@ -213,6 +215,7 @@ resources:
     # define public image bucket
     ImageStaticBucket:
       Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
       Properties:
         BucketName: images.static.${opt:stage,'dev'}.${self:custom.domain}
         PublicAccessBlockConfiguration:
@@ -220,7 +223,6 @@ resources:
           BlockPublicPolicy: false
           IgnorePublicAcls: false
           RestrictPublicBuckets: false
-        DeletionPolicy: Retain
 
     # define a dead letter queue
     DeadLetterQueue:
@@ -340,3 +342,10 @@ resources:
         ParentId: !Ref 'v1Resource'
         PathPart: enqueue
         RestApiId: !Ref 'APIGateway'
+
+    # API deployment
+    APIDeployment:
+      Type: AWS::ApiGateway::Deployment
+      Properties:
+        RestApiId: !Ref 'APIGateway'
+        StageName: ${opt:stage,'dev'}

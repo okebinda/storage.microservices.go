@@ -28,6 +28,7 @@ custom:
 
 provider:
   name: aws
+  region: ${self:custom.region}
   runtime: go1.x
   deploymentBucket:
     name: code.${self:custom.domain}

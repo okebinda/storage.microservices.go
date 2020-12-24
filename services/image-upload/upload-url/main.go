@@ -162,7 +162,7 @@ func generateResponse(statusCode int, body []byte) Response {
 		IsBase64Encoded: false,
 		Body:            buf.String(),
 		Headers: map[string]string{
-			"Content-Type": "application/json",
+			"Content-Type": "application/json; charset=utf-8",
 		},
 	}
 }

@@ -174,7 +174,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	close(file)
 
 	// response
-	redirectURL := fmt.Sprintf("http://%s.s3-website-%s.amazonaws.com/%s", destinationBucket, region, resizedFileKey)
+	redirectURL := fmt.Sprintf("http://%s.s3-website.%s.amazonaws.com/%s", destinationBucket, region, resizedFileKey)
 	return redirectResponse(redirectURL), nil
 }
 

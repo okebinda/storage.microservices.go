@@ -5,3 +5,4 @@
 .serverless/
 services/image-upload/bin/*
 .env*
+*code-workspace
