@@ -3,8 +3,8 @@
 build: gomodgen
 	export GO111MODULE=on
 	env GOOS=linux go build -ldflags="-s -w" -o bin/upload-url upload-url/main.go
-	env GOOS=linux go build -ldflags="-s -w" -o bin/upload-image upload-image/main.go
-	env GOOS=linux go build -ldflags="-s -w" -o bin/upload-image-callback upload-image-callback/main.go
+	env GOOS=linux go build -ldflags="-s -w" -o bin/upload-process upload-process/main.go
+	env GOOS=linux go build -ldflags="-s -w" -o bin/delete delete/main.go
 
 clean:
 	rm -rf ./bin ./vendor Gopkg.lock

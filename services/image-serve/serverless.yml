@@ -9,8 +9,11 @@ service: image-serve
 
 frameworkVersion: '>=2.0.0 <3.0.0'
 
+# enable v3 env variable handling while using v2
+# @todo: remove once upgraded to v3
+useDotenv: true
+
 plugins:
-  - serverless-dotenv-plugin
   - serverless-s3-sync
 
 # custom variables - you should change these to your own values
@@ -35,7 +38,11 @@ provider:
   iamRoleStatements:
     - Effect: "Allow"
       Action:
-        - "s3:GetObject"
+        - "s3:*"
+      Resource: "arn:aws:s3:::images.static.${opt:stage,'dev'}.${self:custom.domain}"
+    - Effect: "Allow"
+      Action:
+        - "s3:*"
       Resource: "arn:aws:s3:::images.static.${opt:stage,'dev'}.${self:custom.domain}/*"
     - Effect: "Allow"
       Action:
@@ -45,6 +52,11 @@ provider:
       Action:
         - "s3:*"
       Resource: "arn:aws:s3:::images.cache.${opt:stage,'dev'}.${self:custom.domain}/*"
+
+  # enable v3 API gateway naming convention
+  # @todo: remove once upgraded to v3
+  apiGateway:
+    shouldStartNameWithService: true
 
 package:
   exclude:

@@ -56,10 +56,10 @@ apt install -y awscli
 ###################
 
 # install NVM
-su - vagrant -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.36.0/install.sh | bash"
+su - vagrant -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh | bash"
 
 # install NodeJS
-su - vagrant -c "source ~/.nvm/nvm.sh; nvm install 12.19.0"
+su - vagrant -c "source ~/.nvm/nvm.sh; nvm install 14.15.3"
 
 
 #####################
@@ -92,7 +92,7 @@ systemctl enable docker
 #
 #################
 
-wget -c https://golang.org/dl/go1.15.3.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
+wget -c https://golang.org/dl/go1.15.6.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
 
 echo "
 # GO vars

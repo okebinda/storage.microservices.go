@@ -10,8 +10,6 @@ import (
 	"math"
 	"net/http"
 	"os"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -31,6 +29,26 @@ import (
 // https://serverless.com/framework/docs/providers/aws/events/apigateway/#lambda-proxy-integration
 type Response events.APIGatewayProxyResponse
 
+// RequestPayload defines the JSON schema for payload received from the request
+type RequestPayload struct {
+	Directory     string `json:"directory"`
+	FileExtension string `json:"file_extension"`
+	FileID        string `json:"file_id"`
+	Height        int    `json:"height"`
+	Width         int    `json:"width"`
+}
+
+// ResponsePayload defines the JSON schema for the payload to send to the callback URL
+type ResponsePayload struct {
+	Bucket        string `json:"bucket"`
+	Directory     string `json:"directory"`
+	FileExtension string `json:"file_extension"`
+	FileID        string `json:"file_id"`
+	Height        int    `json:"height"`
+	SizeBytes     int64  `json:"size_bytes"`
+	Width         int    `json:"width"`
+}
+
 // validImageFormats defines valid image mime types for processing
 var validImageFormats []string = []string{
 	"image/png",
@@ -48,9 +66,13 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	defer logger.Sync()
 
 	// get environment parameters
-	sourceBucket := os.Getenv("AWS_S3_BUCKET_SOURCE")
-	destinationBucket := os.Getenv("AWS_S3_BUCKET_DESTINATION")
-	region := os.Getenv("REGION")
+	uploadBucket := os.Getenv("AWS_S3_BUCKET_UPLOAD")
+	publicBucket := os.Getenv("AWS_S3_BUCKET_PUBLIC")
+	maxBytes, err := strconv.ParseInt(os.Getenv("MAX_BYTES"), 10, 64)
+	if err != nil {
+		logger.Errorf("Could not convert MAX_BYTES to int64: %v", err)
+		return serverErrorResponse(err)
+	}
 	maxWidth, err := strconv.Atoi(os.Getenv("MAX_WIDTH"))
 	if err != nil {
 		logger.Errorf("Could not convert MAX_WIDTH to int: %v", err)
@@ -62,51 +84,37 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 		return serverErrorResponse(err)
 	}
 
-	// get path parameters
-	size := request.PathParameters["size"]
-	imageKey := request.PathParameters["image_key"]
+	// decode request body JSON
+	var requestData RequestPayload
+	err = json.Unmarshal([]byte(request.Body), &requestData)
+	if err != nil {
+		logger.Errorf("Error unmarshalling request body: %v", err)
+		return serverErrorResponse(err)
+	}
 
-	logger.Infow("Request parameters",
-		"size", size,
-		"imageKey", imageKey,
+	logger.Infow("Request data",
+		"directory", requestData.Directory,
+		"file_extension", requestData.FileExtension,
+		"file_id", requestData.FileID,
+		"height", requestData.Height,
+		"width", requestData.Width,
 	)
 
 	// simple sanity check
-	if size == "" || imageKey == "" {
-		logger.Errorf("Missing parameters, cannot complete request; size: %s, image_key: %s", size, imageKey)
-		return userErrorResponse(fmt.Sprintf("Missing parameters, cannot complete request; size: %s, image_key: %s", size, imageKey))
+	if requestData.FileID == "" || requestData.FileExtension == "" {
+		errorMessage := fmt.Sprintf("Missing parameters, cannot complete request; file_id: %s, file_extension: %s", requestData.FileID, requestData.FileExtension)
+		logger.Error(errorMessage)
+		return userErrorResponse(400, errorMessage)
 	}
-
-	// check size parameter is correct format
-	isMatch, err := regexp.MatchString(`^\d+x\d+$`, size)
-	if err != nil {
-		logger.Errorf("Could not read parameter format, cannot complete request; size: %s: %v", size, err)
-		return userErrorResponse(fmt.Sprintf("Could not read parameter format, cannot complete request; size: %s: %v", size, err))
-	}
-	if isMatch == false {
-		logger.Errorf("Bad parameter format, cannot complete request; size: %s", size)
-		return userErrorResponse(fmt.Sprintf("Bad parameter format, cannot complete request; size: %s", size))
-	}
-
-	// parse image dimensions from path
-	sizes := strings.Split(size, "x")
-	width, err := strconv.Atoi(sizes[0])
-	if err != nil {
-		logger.Errorf("Could not convert sizes[0] to int: %v", err)
-		return userErrorResponse("Could not convert width to int.")
-	}
-	height, err := strconv.Atoi(sizes[1])
-	if err != nil {
-		logger.Errorf("Could not convert sizes[1] to int: %v", err)
-		return userErrorResponse("Could not convert height to int.")
-	}
-
-	// initialize AWS session
-	sess := session.Must(session.NewSession())
 
 	// assign file names
-	resizedFileKey := fmt.Sprintf("ratio/%s/%s", size, imageKey)
-	localFile := fmt.Sprintf("/tmp/%s", filepath.Base(imageKey))
+	var fileKey string
+	if requestData.Directory != "" {
+		fileKey = fmt.Sprintf("%s/%s.%s", requestData.Directory, requestData.FileID, requestData.FileExtension)
+	} else {
+		fileKey = fmt.Sprintf("%s.%s", requestData.FileID, requestData.FileExtension)
+	}
+	localFile := fmt.Sprintf("/tmp/%s.%s", requestData.FileID, requestData.FileExtension)
 
 	// create local temp file
 	file, err := os.Create(localFile)
@@ -115,12 +123,26 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 		return serverErrorResponse(err)
 	}
 
+	// initialize AWS session
+	sess := session.Must(session.NewSession())
+
 	// download file from S3
-	_, err = downloadFile(sess, file, sourceBucket, imageKey)
+	numBytes, err := downloadFile(sess, file, uploadBucket, fileKey)
 	if err != nil {
-		logger.Errorf("S3 downloader error: %s, %s", imageKey, err)
+		logger.Errorf("S3 downloader error: %s", err)
 		close(file)
+		if strings.HasPrefix(err.Error(), "NoSuchKey") {
+			return userErrorResponse(404, "Not found.")
+		}
 		return serverErrorResponse(err)
+	}
+
+	// reject large files
+	if numBytes > maxBytes {
+		errorMessage := fmt.Sprintf("File is too large: %d, %s", numBytes, fileKey)
+		logger.Errorf(errorMessage)
+		close(file)
+		return userErrorResponse(400, errorMessage)
 	}
 
 	// detect file type
@@ -133,9 +155,10 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 
 	// reject bad file types
 	if !contains(validImageFormats, fileType) {
-		logger.Errorf("Unsupported file type: %s", fileType)
+		errorMessage := fmt.Sprintf("Unsupported file type: %s, %s", fileType, fileKey)
+		logger.Errorf(errorMessage)
 		close(file)
-		return userErrorResponse(fmt.Sprintf("Unsupported file type: %s", fileType))
+		return userErrorResponse(400, errorMessage)
 	}
 
 	// open image
@@ -146,10 +169,16 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 		return serverErrorResponse(err)
 	}
 
-	// resize image
-	width = min(maxWidth, width)
-	height = min(maxHeight, height)
-	err = resizeImage(img, localFile, width, height)
+	// resize image if too large
+	newMaxWidth := maxWidth
+	if requestData.Width > 0 {
+		newMaxWidth = min(newMaxWidth, requestData.Width)
+	}
+	newMaxHeight := maxHeight
+	if requestData.Height > 0 {
+		newMaxHeight = min(newMaxHeight, requestData.Height)
+	}
+	finalWidth, finalHeight, err := resizeImageIfTooLarge(img, localFile, newMaxWidth, newMaxHeight)
 	if err != nil {
 		logger.Errorf("Failed to resize image: %v", err)
 		close(file)
@@ -157,25 +186,42 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	}
 
 	// upload to public bucket
-	err = uploadFile(sess, file, destinationBucket, resizedFileKey, fileType)
+	err = uploadFile(sess, file, publicBucket, fileKey, fileType)
 	if err != nil {
-		logger.Errorf("Failed to upload file: %s, %v", resizedFileKey, err)
+		logger.Errorf("Failed to upload file: %v", err)
 		close(file)
 		return serverErrorResponse(err)
 	}
 
-	logger.Infow("Image resize complete.",
-		"bucket", destinationBucket,
-		"file_key", resizedFileKey,
-		"width", width,
-		"height", height,
+	logger.Infow("Image upload complete.",
+		"bucket", publicBucket,
+		"file_key", fileKey,
 	)
+
+	// get final file size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		logger.Errorf("Failed to stat file: %v", err)
+		close(file)
+		return serverErrorResponse(err)
+	}
+	finalNumBytes := fileInfo.Size()
 
 	close(file)
 
+	// create response payload
+	responseData := &ResponsePayload{
+		Bucket:        publicBucket,
+		Directory:     requestData.Directory,
+		FileExtension: requestData.FileExtension,
+		FileID:        requestData.FileID,
+		Height:        finalWidth,
+		SizeBytes:     finalNumBytes,
+		Width:         finalHeight,
+	}
+
 	// response
-	redirectURL := fmt.Sprintf("http://%s.s3-website.%s.amazonaws.com/%s", destinationBucket, region, resizedFileKey)
-	return redirectResponse(redirectURL), nil
+	return successResponse(responseData)
 }
 
 // sugaredLogger initializes the zap sugar logger
@@ -231,34 +277,36 @@ func contains(a []string, x string) bool {
 	return false
 }
 
-// min returns the lesser of two ints
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// resizeImage resizes an image, maintaining its aspect ratio
-func resizeImage(img image.Image, localFile string, widthIn, heightIn int) error {
+// resizeImageIfTooLarge resizes an image if the width or height dimensions are too large
+func resizeImageIfTooLarge(img image.Image, localFile string, maxWidth, maxHeight int) (int, int, error) {
 	var err error
 
 	// get dimensions
 	width := img.Bounds().Max.X
 	height := img.Bounds().Max.Y
 
-	// resize
-	ratioX := float64(widthIn) / float64(width)
-	ratioY := float64(heightIn) / float64(height)
-	ratio := math.Min(ratioX, ratioY)
+	// resize if needed
+	if width > maxWidth || height > maxHeight {
 
-	newWidth := int(float64(width) * ratio)
-	newHeight := int(float64(height) * ratio)
+		ratioX := float64(maxWidth) / float64(width)
+		ratioY := float64(maxHeight) / float64(height)
+		ratio := math.Min(ratioX, ratioY)
 
-	img = imaging.Resize(img, newWidth, newHeight, imaging.Lanczos)
-	err = imaging.Save(img, localFile)
+		width = int(float64(width) * ratio)
+		height = int(float64(height) * ratio)
 
-	return err
+		img = imaging.Resize(img, width, height, imaging.Lanczos)
+		err = imaging.Save(img, localFile)
+	}
+	return width, height, err
+}
+
+// min returns the lesser of two ints
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // uploadFile uploads a file to an S3 bucket
@@ -285,20 +333,18 @@ func uploadFile(sess *session.Session, file *os.File, bucketName, fileKey, fileT
 	return err
 }
 
-// successResponse generates a redirect (301) response
-func redirectResponse(redirectURL string) Response {
-	return Response{
-		StatusCode:      301,
-		IsBase64Encoded: false,
-		Body:            "",
-		Headers: map[string]string{
-			"location": redirectURL,
-		},
+// successResponse generates a success (200) response
+func successResponse(payload *ResponsePayload) (Response, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		logger.Errorf("Marshalling error: %s", err)
+		return Response{StatusCode: 500}, err
 	}
+	return generateResponse(200, body), nil
 }
 
 // userErrorResponse generates a user error (400) response
-func userErrorResponse(errorMessage string) (Response, error) {
+func userErrorResponse(code int, errorMessage string) (Response, error) {
 	body, err := json.Marshal(map[string]interface{}{
 		"error": errorMessage,
 	})
@@ -306,7 +352,7 @@ func userErrorResponse(errorMessage string) (Response, error) {
 		logger.Errorf("Marshalling error: %s", err)
 		return Response{StatusCode: 500}, err
 	}
-	return generateResponse(400, body), nil
+	return generateResponse(code, body), nil
 }
 
 // serverErrorResponse generates a server error (500) response
