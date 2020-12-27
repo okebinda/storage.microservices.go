@@ -72,9 +72,11 @@ $ make
 
 ### Local Invocation
 
+#### Upload URL
+
 ```ssh
 $ cd /vagrant/services/image-upload
-$ sls invoke local --function upload-url --data '{"queryStringParameters": {"extension":"png", "directory":"test"}}'
+$ sls invoke local --function image-upload  --data '{"httpMethod":"GET", "path":"image/upload-url", "queryStringParameters": {"extension":"png", "directory":"test"}}'
 ```
 
 ### Use
@@ -84,7 +86,7 @@ $ sls invoke local --function upload-url --data '{"queryStringParameters": {"ext
 To generate a pre-signed S3 upload URL, make a request to the public URL of the lambda function with the `directory` and `extension` parameters, for example:
 
 ```ssh
-$ curl "https://XXXXXX.execute-api.us-east-1.amazonaws.com/dev/upload-url?directory=test&extension=png"
+$ curl "https://XXXXXX.execute-api.us-east-1.amazonaws.com/dev/image/upload-url?directory=test&extension=png"
 ```
 
 (Note that the raw output from curl has the '&' character encoded as '\u0026', which browsers and most tools will interpret correctly.)
@@ -110,7 +112,7 @@ To complete the image upload process, POST a JSON message to the upload process 
 For example:
 
 ```ssh
-$ curl -X POST -H "Content-Type: application/json" -d '{"file_id": "90546589-e63c-4de1-bd49-042ecd20daf1", "file_extension": "png", "directory": "test", "width": 250, "height": 250}' "https://XXXXXX.execute-api.us-east-1.amazonaws.com/dev/upload-process"
+$ curl -X POST -H "Content-Type: application/json" -d '{"file_id": "90546589-e63c-4de1-bd49-042ecd20daf1", "file_extension": "png", "directory": "test", "width": 250, "height": 250}' "https://XXXXXX.execute-api.us-east-1.amazonaws.com/dev/image/process-upload"
 ```
 
 #### Delete an Image
@@ -118,7 +120,7 @@ $ curl -X POST -H "Content-Type: application/json" -d '{"file_id": "90546589-e63
 To delete an image from the static S3 bucket make a DELETE request to the public URL of the delete Lambda function with the image's key appended to the end of the URL, for example:
 
 ```ssh
-$ curl -X DELETE "https://87ihcj1cs7.execute-api.us-east-1.amazonaws.com/dev/delete/test/90546589-e63c-4de1-bd49-042ecd20daf1.png"
+$ curl -X DELETE "https://87ihcj1cs7.execute-api.us-east-1.amazonaws.com/dev/image/delete/test/90546589-e63c-4de1-bd49-042ecd20daf1.png"
 ```
 
 ### Deployment

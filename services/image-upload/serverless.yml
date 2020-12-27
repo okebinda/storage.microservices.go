@@ -17,9 +17,6 @@ custom:
   region: ${env:REGION, "us-east-1"}
   domain: ${env:DOMAIN, "domain.com"}
   prefix: ${env:PREFIX, "aws-com-domain"}
-  apiSecretKey: ${env:API_SECRET_KEY, "-"}
-  apiUsername: ${env:API_USERNAME, "-"}
-  apiPassword: ${env:API_PASSWORD, "-"}
   maxUploadBytes: "6291456"
   maxUploadWidth: "2000"
   maxUploadHeight: "2000"
@@ -41,37 +38,28 @@ package:
     - ./**
   include:
     - bin/**
-  # individually: true
 
 functions:
 
-  # upload-url function
-  upload-url:
-    handler: bin/upload-url
-    name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-upload-url
-    role: UploadURLLambdaRole
+  # image-upload function
+  image-upload:
+    handler: bin/image-upload
+    name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-image-upload
+    role: ImageUploadLambdaRole
     events:
       - http:
-          path: upload-url
+          path: image/upload-url
           method: get
+      - http:
+          path: image/process-upload
+          method: post
+      - http:
+          path: image/delete/{image_key+}
+          method: delete
           request:
             parameters:
-              querystrings:
-                directory: true
-                owner_id: true
-                extension: true
-    environment:
-      AWS_S3_BUCKET_UPLOAD: !Ref ImageUploadBucket
-
-  # upload-process function
-  upload-process:
-    handler: bin/upload-process
-    name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-upload-process
-    role: ImageProcessLambdaRole
-    events:
-      - http:
-          path: upload-process
-          method: post
+              paths:
+                image_key: true
     environment:
       AWS_S3_BUCKET_UPLOAD: !Ref ImageUploadBucket
       AWS_S3_BUCKET_PUBLIC: !Ref ImageStaticBucket
@@ -79,31 +67,15 @@ functions:
       MAX_WIDTH: ${self:custom.maxUploadWidth}
       MAX_HEIGHT: ${self:custom.maxUploadHeight}
 
-  # delete function
-  delete:
-    handler: bin/delete
-    name: ${self:custom.prefix}-${opt:stage,'dev'}-lambda-delete
-    role: ImageDeleteLambdaRole
-    events:
-      - http:
-          path: delete/{image_key+}
-          method: delete
-          request:
-            parameters:
-              paths:
-                image_key: true
-    environment:
-      AWS_S3_BUCKET_PUBLIC: !Ref ImageStaticBucket
-
 # CloudFormation resource templates
 resources:
   Resources:
 
-    # define IAM role for the Upload URL Lambda
-    UploadURLLambdaRole:
+    # define IAM role for the Image Upload Lambda
+    ImageUploadLambdaRole:
       Type: AWS::IAM::Role
       Properties:
-        RoleName: ${self:custom.prefix}-${opt:stage,'dev'}-upload-url-lambda-role
+        RoleName: ${self:custom.prefix}-${opt:stage,'dev'}-image-upload-lambda-role
         AssumeRolePolicyDocument:
           Version: '2012-10-17'
           Statement:
@@ -123,42 +95,6 @@ resources:
               Version: '2012-10-17'
               Statement:
                 - Effect: Allow
-                  Action: s3:PutObject
-                  Resource:
-                    - !Join 
-                      - ''
-                      - - 'arn:aws:s3:::'
-                        - !Ref ImageUploadBucket
-                    - !Join 
-                      - ''
-                      - - 'arn:aws:s3:::'
-                        - !Ref ImageUploadBucket
-                        - '/*'
-
-    # define IAM role for the Image Process Lambda
-    ImageProcessLambdaRole:
-      Type: AWS::IAM::Role
-      Properties:
-        RoleName: ${self:custom.prefix}-${opt:stage,'dev'}-upload-process-lambda-role
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-              Action: sts:AssumeRole
-        Path: /
-        ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-        Policies:
-          - PolicyName: ${self:custom.prefix}-${opt:stage,'dev'}-upload-process-lambda-policy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
                   Action: s3:*
                   Resource:
                     - !Join 
@@ -170,42 +106,6 @@ resources:
                       - - 'arn:aws:s3:::'
                         - !Ref ImageUploadBucket
                         - '/*'
-                    - !Join 
-                      - ''
-                      - - 'arn:aws:s3:::'
-                        - !Ref ImageStaticBucket
-                    - !Join 
-                      - ''
-                      - - 'arn:aws:s3:::'
-                        - !Ref ImageStaticBucket
-                        - '/*'
-
-    # define IAM role for the Image Delete Lambda
-    ImageDeleteLambdaRole:
-      Type: AWS::IAM::Role
-      Properties:
-        RoleName: ${self:custom.prefix}-${opt:stage,'dev'}-upload-delete-lambda-role
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-              Action: sts:AssumeRole
-        Path: /
-        ManagedPolicyArns:
-          - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-          - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
-        Policies:
-          - PolicyName: ${self:custom.prefix}-${opt:stage,'dev'}-upload-delete-lambda-policy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action: s3:*
-                  Resource:
                     - !Join 
                       - ''
                       - - 'arn:aws:s3:::'

@@ -2,32 +2,21 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"image"
-	"log"
 	"math"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/disintegration/imaging"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
-
-// Response is the response sent to AWS API Gateway
-// https://serverless.com/framework/docs/providers/aws/events/apigateway/#lambda-proxy-integration
-type Response events.APIGatewayProxyResponse
 
 // RequestPayload defines the JSON schema for payload received from the request
 type RequestPayload struct {
@@ -55,15 +44,8 @@ var validImageFormats []string = []string{
 	"image/jpeg",
 }
 
-var logger *zap.SugaredLogger
-
-// Handler is our lambda handler invoked by the `lambda.Start` function call
-func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Response, error) {
-
-	// initialize logger
-	lc, _ := lambdacontext.FromContext(ctx)
-	logger = sugaredLogger(lc.AwsRequestID)
-	defer logger.Sync()
+// PostProcessUpload moves an image from the upload S3 bucket to the static S3 bucket
+func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 
 	// get environment parameters
 	uploadBucket := os.Getenv("AWS_S3_BUCKET_UPLOAD")
@@ -71,26 +53,27 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	maxBytes, err := strconv.ParseInt(os.Getenv("MAX_BYTES"), 10, 64)
 	if err != nil {
 		logger.Errorf("Could not convert MAX_BYTES to int64: %v", err)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 	maxWidth, err := strconv.Atoi(os.Getenv("MAX_WIDTH"))
 	if err != nil {
 		logger.Errorf("Could not convert MAX_WIDTH to int: %v", err)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 	maxHeight, err := strconv.Atoi(os.Getenv("MAX_HEIGHT"))
 	if err != nil {
 		logger.Errorf("Could not convert MAX_HEIGHT to int: %v", err)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
-	// decode request body JSON
+	// get payload from request body
 	var requestData RequestPayload
-	err = json.Unmarshal([]byte(request.Body), &requestData)
-	if err != nil {
+	decoder := json.NewDecoder(r.Body)
+	if err = decoder.Decode(&requestData); err != nil {
 		logger.Errorf("Error unmarshalling request body: %v", err)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
+	defer r.Body.Close()
 
 	logger.Infow("Request data",
 		"directory", requestData.Directory,
@@ -104,7 +87,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	if requestData.FileID == "" || requestData.FileExtension == "" {
 		errorMessage := fmt.Sprintf("Missing parameters, cannot complete request; file_id: %s, file_extension: %s", requestData.FileID, requestData.FileExtension)
 		logger.Error(errorMessage)
-		return userErrorResponse(400, errorMessage)
+		userErrorResponse(w, 400, errorMessage)
 	}
 
 	// assign file names
@@ -120,7 +103,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	file, err := os.Create(localFile)
 	if err != nil {
 		logger.Errorf("os.Create() error: %s", err)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
 	// initialize AWS session
@@ -132,9 +115,9 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 		logger.Errorf("S3 downloader error: %s", err)
 		close(file)
 		if strings.HasPrefix(err.Error(), "NoSuchKey") {
-			return userErrorResponse(404, "Not found.")
+			userErrorResponse(w, 404, "Not found.")
 		}
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
 	// reject large files
@@ -142,7 +125,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 		errorMessage := fmt.Sprintf("File is too large: %d, %s", numBytes, fileKey)
 		logger.Errorf(errorMessage)
 		close(file)
-		return userErrorResponse(400, errorMessage)
+		userErrorResponse(w, 400, errorMessage)
 	}
 
 	// detect file type
@@ -150,7 +133,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	if err != nil {
 		logger.Errorf("File read error: %s", err)
 		close(file)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
 	// reject bad file types
@@ -158,7 +141,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 		errorMessage := fmt.Sprintf("Unsupported file type: %s, %s", fileType, fileKey)
 		logger.Errorf(errorMessage)
 		close(file)
-		return userErrorResponse(400, errorMessage)
+		userErrorResponse(w, 400, errorMessage)
 	}
 
 	// open image
@@ -166,7 +149,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	if err != nil {
 		logger.Errorf("Failed to open image: %v", err)
 		close(file)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
 	// resize image if too large
@@ -182,7 +165,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	if err != nil {
 		logger.Errorf("Failed to resize image: %v", err)
 		close(file)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
 	// upload to public bucket
@@ -190,7 +173,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	if err != nil {
 		logger.Errorf("Failed to upload file: %v", err)
 		close(file)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 
 	logger.Infow("Image upload complete.",
@@ -203,7 +186,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	if err != nil {
 		logger.Errorf("Failed to stat file: %v", err)
 		close(file)
-		return serverErrorResponse(err)
+		serverErrorResponse(w)
 	}
 	finalNumBytes := fileInfo.Size()
 
@@ -221,19 +204,7 @@ func Handler(ctx context.Context, request events.APIGatewayProxyRequest) (Respon
 	}
 
 	// response
-	return successResponse(responseData)
-}
-
-// sugaredLogger initializes the zap sugar logger
-func sugaredLogger(requestID string) *zap.SugaredLogger {
-	// zapLogger, err := zap.NewDevelopment()
-	zapLogger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatalf("can't initialize zap logger: %v", err)
-	}
-	return zapLogger.
-		With(zap.Field{Key: "request_id", Type: zapcore.StringType, String: requestID}).
-		Sugar()
+	successResponse(w, 201, responseData)
 }
 
 // close closes a file and logs any errors
@@ -331,56 +302,4 @@ func uploadFile(sess *session.Session, file *os.File, bucketName, fileKey, fileT
 		ContentDisposition: aws.String("attachment"),
 	})
 	return err
-}
-
-// successResponse generates a success (200) response
-func successResponse(payload *ResponsePayload) (Response, error) {
-	body, err := json.Marshal(payload)
-	if err != nil {
-		logger.Errorf("Marshalling error: %s", err)
-		return Response{StatusCode: 500}, err
-	}
-	return generateResponse(200, body), nil
-}
-
-// userErrorResponse generates a user error (400) response
-func userErrorResponse(code int, errorMessage string) (Response, error) {
-	body, err := json.Marshal(map[string]interface{}{
-		"error": errorMessage,
-	})
-	if err != nil {
-		logger.Errorf("Marshalling error: %s", err)
-		return Response{StatusCode: 500}, err
-	}
-	return generateResponse(code, body), nil
-}
-
-// serverErrorResponse generates a server error (500) response
-func serverErrorResponse(errorMessage error) (Response, error) {
-	body, err := json.Marshal(map[string]interface{}{
-		"error": "Server error",
-	})
-	if err != nil {
-		logger.Errorf("Marshalling error: %s", err)
-		return Response{StatusCode: 500}, err
-	}
-	return generateResponse(500, body), errorMessage
-}
-
-// generateResponse generates an HTTP JSON Lambda response to return to the user
-func generateResponse(statusCode int, body []byte) Response {
-	var buf bytes.Buffer
-	json.HTMLEscape(&buf, body)
-	return Response{
-		StatusCode:      statusCode,
-		IsBase64Encoded: false,
-		Body:            buf.String(),
-		Headers: map[string]string{
-			"Content-Type": "application/json; charset=utf-8",
-		},
-	}
-}
-
-func main() {
-	lambda.Start(Handler)
 }
