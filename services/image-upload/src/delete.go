@@ -14,6 +14,13 @@ import (
 // DeleteImage removes an image from the static S3 bucket
 func DeleteImage(w http.ResponseWriter, r *http.Request) {
 
+	// check API key
+	ok := authentication(r)
+	if !ok {
+		userErrorResponse(w, 403, "Permission denied.")
+		return
+	}
+
 	// get environment parameters
 	bucket := os.Getenv("AWS_S3_BUCKET_PUBLIC")
 

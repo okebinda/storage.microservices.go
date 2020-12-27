@@ -11,14 +11,14 @@
 #
 #  Packages:
 #   Go 1.15
-#   NodeJS 12
+#   NodeJS 14
 #   serverless
 #   awscli
 #   docker
 #   vim tmux screen git zip build-essential
 #
 #  author: https://github.com/okebinda
-#  date: October, 2020
+#  date: December, 2020
 #
 ############################
 

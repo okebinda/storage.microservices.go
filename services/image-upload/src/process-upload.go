@@ -27,7 +27,7 @@ type RequestPayload struct {
 	Width         int    `json:"width"`
 }
 
-// ResponsePayload defines the JSON schema for the payload to send to the callback URL
+// ResponsePayload defines the JSON schema for the payload to return to the request
 type ResponsePayload struct {
 	Bucket        string `json:"bucket"`
 	Directory     string `json:"directory"`
@@ -46,6 +46,13 @@ var validImageFormats []string = []string{
 
 // PostProcessUpload moves an image from the upload S3 bucket to the static S3 bucket
 func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
+
+	// check API key
+	ok := authentication(r)
+	if !ok {
+		userErrorResponse(w, 403, "Permission denied.")
+		return
+	}
 
 	// get environment parameters
 	uploadBucket := os.Getenv("AWS_S3_BUCKET_UPLOAD")

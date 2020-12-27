@@ -64,6 +64,7 @@ The service uses `.env` files to configure custom values in the `serverless.yml`
 DOMAIN=domain.com
 PREFIX=aws-com-domain
 REGION=us-east-1
+API_KEY=
 ```
 
 ### Install Dependencies
@@ -92,6 +93,10 @@ $ sls invoke local --function image-upload  --data '{"httpMethod":"GET", "path":
 ```
 
 ### Use
+
+#### 0) Authentication
+
+If you set an `API_KEY` value in your `.env` file, then you must add an `X-API-KEY` header with each Lambda request set to that value. If you want to use more fine-grained permissions, look into using AWS API Gateway authentication patterns. If you do not want to use API Key authentication, then leave `API_KEY` blank. The examples below assume no authentication for simplicity.
 
 #### 1) Generate a Pre-Signed S3 Upload URL
 

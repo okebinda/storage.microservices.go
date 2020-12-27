@@ -22,6 +22,13 @@ var extensionMap map[string]string = map[string]string{
 // GetUploadURL retrieves a pre-signed S3 bucket upload URL
 func GetUploadURL(w http.ResponseWriter, r *http.Request) {
 
+	// check API key
+	ok := authentication(r)
+	if !ok {
+		userErrorResponse(w, 403, "Permission denied.")
+		return
+	}
+
 	// get request parameters
 	directory := r.URL.Query().Get("directory")
 	extension := r.URL.Query().Get("extension")

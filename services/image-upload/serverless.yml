@@ -17,6 +17,7 @@ custom:
   region: ${env:REGION, "us-east-1"}
   domain: ${env:DOMAIN, "domain.com"}
   prefix: ${env:PREFIX, "aws-com-domain"}
+  apiKey: ${env:API_KEY, ""}
   maxUploadBytes: "6291456"
   maxUploadWidth: "2000"
   maxUploadHeight: "2000"
@@ -66,6 +67,7 @@ functions:
       MAX_BYTES: ${self:custom.maxUploadBytes}
       MAX_WIDTH: ${self:custom.maxUploadWidth}
       MAX_HEIGHT: ${self:custom.maxUploadHeight}
+      API_KEY: ${self:custom.apiKey}
 
 # CloudFormation resource templates
 resources:

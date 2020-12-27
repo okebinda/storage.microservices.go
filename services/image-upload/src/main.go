@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -51,6 +52,18 @@ func sugaredLogger(requestID string) *zap.SugaredLogger {
 	return zapLogger.
 		With(zap.Field{Key: "request_id", Type: zapcore.StringType, String: requestID}).
 		Sugar()
+}
+
+// authentication checks the request headers for an X_API_KEY value and compares it to env parameter
+func authentication(r *http.Request) bool {
+	APIKey := os.Getenv("API_KEY")
+	if APIKey != "" {
+		headerAPIKey := r.Header.Get("X-API-KEY")
+		if headerAPIKey != APIKey {
+			return false
+		}
+	}
+	return true
 }
 
 // successResponse generates a success (200) response
