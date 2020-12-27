@@ -28,6 +28,7 @@ func DeleteImage(w http.ResponseWriter, r *http.Request) {
 	if imageKey == "" {
 		logger.Errorf("Missing parameters, cannot complete request; image_key: %s", imageKey)
 		userErrorResponse(w, 400, fmt.Sprintf("Missing parameters, cannot complete request; image_key: %s", imageKey))
+		return
 	}
 
 	// delete object
@@ -35,6 +36,7 @@ func DeleteImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorf("Failed delete object: %s", err)
 		serverErrorResponse(w)
+		return
 	}
 
 	logger.Infow("Object deleted.")

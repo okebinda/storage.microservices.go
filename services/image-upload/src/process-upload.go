@@ -54,16 +54,19 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorf("Could not convert MAX_BYTES to int64: %v", err)
 		serverErrorResponse(w)
+		return
 	}
 	maxWidth, err := strconv.Atoi(os.Getenv("MAX_WIDTH"))
 	if err != nil {
 		logger.Errorf("Could not convert MAX_WIDTH to int: %v", err)
 		serverErrorResponse(w)
+		return
 	}
 	maxHeight, err := strconv.Atoi(os.Getenv("MAX_HEIGHT"))
 	if err != nil {
 		logger.Errorf("Could not convert MAX_HEIGHT to int: %v", err)
 		serverErrorResponse(w)
+		return
 	}
 
 	// get payload from request body
@@ -72,6 +75,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 	if err = decoder.Decode(&requestData); err != nil {
 		logger.Errorf("Error unmarshalling request body: %v", err)
 		serverErrorResponse(w)
+		return
 	}
 	defer r.Body.Close()
 
@@ -88,6 +92,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		errorMessage := fmt.Sprintf("Missing parameters, cannot complete request; file_id: %s, file_extension: %s", requestData.FileID, requestData.FileExtension)
 		logger.Error(errorMessage)
 		userErrorResponse(w, 400, errorMessage)
+		return
 	}
 
 	// assign file names
@@ -104,6 +109,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorf("os.Create() error: %s", err)
 		serverErrorResponse(w)
+		return
 	}
 
 	// initialize AWS session
@@ -116,8 +122,10 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		close(file)
 		if strings.HasPrefix(err.Error(), "NoSuchKey") {
 			userErrorResponse(w, 404, "Not found.")
+			return
 		}
 		serverErrorResponse(w)
+		return
 	}
 
 	// reject large files
@@ -126,6 +134,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf(errorMessage)
 		close(file)
 		userErrorResponse(w, 400, errorMessage)
+		return
 	}
 
 	// detect file type
@@ -134,6 +143,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("File read error: %s", err)
 		close(file)
 		serverErrorResponse(w)
+		return
 	}
 
 	// reject bad file types
@@ -142,6 +152,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf(errorMessage)
 		close(file)
 		userErrorResponse(w, 400, errorMessage)
+		return
 	}
 
 	// open image
@@ -150,6 +161,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Failed to open image: %v", err)
 		close(file)
 		serverErrorResponse(w)
+		return
 	}
 
 	// resize image if too large
@@ -166,6 +178,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Failed to resize image: %v", err)
 		close(file)
 		serverErrorResponse(w)
+		return
 	}
 
 	// upload to public bucket
@@ -174,6 +187,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Failed to upload file: %v", err)
 		close(file)
 		serverErrorResponse(w)
+		return
 	}
 
 	logger.Infow("Image upload complete.",
@@ -187,6 +201,7 @@ func PostProcessUpload(w http.ResponseWriter, r *http.Request) {
 		logger.Errorf("Failed to stat file: %v", err)
 		close(file)
 		serverErrorResponse(w)
+		return
 	}
 	finalNumBytes := fileInfo.Size()
 

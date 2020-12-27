@@ -36,6 +36,7 @@ func GetUploadURL(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		logger.Errorf("Unsupported extension: %s", extension)
 		userErrorResponse(w, 400, fmt.Sprintf("Unsupported extension: %s", extension))
+		return
 	}
 
 	// generate S3 file key
@@ -46,6 +47,7 @@ func GetUploadURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorf("Failed to sign request: %s", err)
 		serverErrorResponse(w)
+		return
 	}
 
 	logger.Infow("Response parameters",

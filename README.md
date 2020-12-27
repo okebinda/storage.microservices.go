@@ -56,6 +56,16 @@ Sometimes it is useful to completely remove all residual Vagrant files after des
 
 ## Service: Image Upload
 
+### Configure
+
+The service uses `.env` files to configure custom values in the `serverless.yml` configuration file. It is recommended to create `.env` files for each environment (dev, stage, prod, etc.) using a template similar to the following (make sure to change the values to reflect your situation):
+
+```
+DOMAIN=domain.com
+PREFIX=aws-com-domain
+REGION=us-east-1
+```
+
 ### Install Dependencies
 
 ```ssh
@@ -73,6 +83,8 @@ $ make
 ### Local Invocation
 
 #### Upload URL
+
+Use the following to perform a local smoke test for the Upload URL function:
 
 ```ssh
 $ cd /vagrant/services/image-upload
@@ -120,7 +132,7 @@ $ curl -X POST -H "Content-Type: application/json" -d '{"file_id": "90546589-e63
 To delete an image from the static S3 bucket make a DELETE request to the public URL of the delete Lambda function with the image's key appended to the end of the URL, for example:
 
 ```ssh
-$ curl -X DELETE "https://87ihcj1cs7.execute-api.us-east-1.amazonaws.com/dev/image/delete/test/90546589-e63c-4de1-bd49-042ecd20daf1.png"
+$ curl -X DELETE "https://XXXXXX.execute-api.us-east-1.amazonaws.com/dev/image/delete/test/90546589-e63c-4de1-bd49-042ecd20daf1.png"
 ```
 
 ### Deployment
@@ -155,6 +167,15 @@ $ ./scripts/lint.sh
 
 ## Service: Image Serve
 
+The service uses `.env` files to configure custom values in the `serverless.yml` configuration file. It is recommended to create `.env` files for each environment (dev, stage, prod, etc.) using a template similar to the following (make sure to change the values to reflect your situation):
+
+```
+DOMAIN=domain.com
+PREFIX=aws-com-domain
+REGION=us-east-1
+IMAGE_SERVE_HOSTNAME=XXXXXX.execute-api.us-east-1.amazonaws.com
+```
+
 ### Install Dependencies
 
 ```ssh
@@ -171,9 +192,13 @@ $ make
 
 ### Local Invocation
 
+#### Resize Ratio
+
+Use the following to perform a local smoke test for the Resize Ration function, should return a 404 error:
+
 ```ssh
 $ cd /vagrant/services/image-serve
-$ sls invoke local --function image-resize-ratio --data '{"pathParameters": {"size":"400x300", "image_key":"test/image.jpg"}}'
+$ sls invoke local --function image-serve --data '{"httpMethod":"GET", "path":"/ratio/400x300/test/90546589-e63c-4de1-bd49-042ecd20daf1.png"}'
 ```
 
 ### Use
@@ -221,19 +246,16 @@ $ ./scripts/lint.sh
 | `services/`                   | Contains all source code files required for the services                           |
 | `├─image-serve/`              | Contains the source code for the Image Serve service                               |
 | `│· ├─bin/`                   | Contains compiled service binaries                                                 |
-| `│· ├─image-resize-crop/`     | Contains source code for the Image Resize Crop microservice                        |
-| `│· ├─image-resize-ratio/`    | Contains source code for the Image Resize Ratio microservice                       |
 | `│· ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
+| `|· ├─src/`                   | Contains source code for all of the Image Serve microservices                      |
 | `│· ├─static/`                | Contains HTML files for the index and error pages used for S3 website hosting      |
 | `│· ├─go.mod`                 | Dependency requirements                                                            |
 | `│· ├─Makefile`               | Instructions for `make` to build service binaries                                  |
 | `│· └─serverless.yml`         | Serverless framework configuration file                                            |
 | `└─image-upload/`             | Contains the source code for the Image Upload service                              |
 | ` · ├─bin/`                   | Contains compiled service binaries                                                 |
-| ` · ├─delete/`                | Contains source code for the Delete Image microservice                             |
 | ` · ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
-| ` · ├─upload-process/`        | Contains source code for the Upload Process Image microservice                     |
-| ` · ├─upload-url/`            | Contains source code for the Upload URL microservice                               |
+| ` · ├─src/`                   | Contains source code for all of the Image Upload microservices                     |
 | ` · ├─go.mod`                 | Dependency requirements                                                            |
 | ` · ├─Makefile`               | Instructions for `make` to build service binaries                                  |
 | ` · └─serverless.yml`         | Serverless framework configuration file                                            |
