@@ -247,7 +247,7 @@ $ ./scripts/lint.sh
 | `├─image-serve/`              | Contains the source code for the Image Serve service                               |
 | `│· ├─bin/`                   | Contains compiled service binaries                                                 |
 | `│· ├─scripts/`               | Contains scripts to build the service, run linters, and any other useful tools     |
-| `|· ├─src/`                   | Contains source code for all of the Image Serve microservices                      |
+| `│· ├─src/`                   | Contains source code for all of the Image Serve microservices                      |
 | `│· ├─static/`                | Contains HTML files for the index and error pages used for S3 website hosting      |
 | `│· ├─go.mod`                 | Dependency requirements                                                            |
 | `│· ├─Makefile`               | Instructions for `make` to build service binaries                                  |
@@ -261,7 +261,7 @@ $ ./scripts/lint.sh
 | ` · └─serverless.yml`         | Serverless framework configuration file                                            |
 | `data/`                       | Contains additional resources, such as sample images                               |
 | `documentation/`              | Documentation files                                                                |
-| `provision/`                  | Provision scripts for local virtual machine and production servers                 |
+| `provision/`                  | Provision scripts for local virtual machine                                        |
 | `scripts/`                    | Contains various scripts                                                           |
 | `LICENSE`                     | The license that governs usage of the this source code                             |
 | `README.md`                   | This file                                                                          |
